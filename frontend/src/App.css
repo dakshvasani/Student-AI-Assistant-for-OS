@@ -171,6 +171,18 @@ footer {
   padding: 8px;
 }
 
+.sources {
+  margin-top: 15px;
+  padding-top: 12px;
+  border-top: 1px solid #ddd;
+  font-size: 13px;
+}
+
+.source-item {
+  margin-top: 6px;
+  color: #666;
+}
+
 @media (max-width: 600px) {
   .app {
     padding: 0;

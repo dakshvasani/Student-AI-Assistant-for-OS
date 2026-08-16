@@ -46,6 +46,7 @@ function App() {
         {
           role: "assistant",
           text: data.answer,
+          sources: data.sources || [],
         },
       ]);
     } catch (error) {
@@ -133,6 +134,25 @@ function App() {
 
               <div className="message-text">
                 {message.text}
+                        
+                {message.role === "assistant" &&
+                  message.sources &&
+                  message.sources.length > 0 && (
+                    <div className="sources">
+                      <strong>📚 Sources</strong>
+                  
+                      {message.sources.map((source) => (
+                        <div
+                          key={source.chunk_id}
+                          className="source-item"
+                        >
+                          Operating System — Section{" "}
+                          {source.chunk_id}
+                          {" "}({source.similarity})
+                        </div>
+                      ))}
+                    </div>
+                  )}
               </div>
             </div>
           ))}
