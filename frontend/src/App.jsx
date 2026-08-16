@@ -1,10 +1,14 @@
 import { useState } from "react";
-import "./App.css";
+import "./App.css"; 
 
 function App() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(false);
+
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState("");
 
   const askQuestion = async () => {
     if (!question.trim()) {
@@ -72,6 +76,59 @@ function App() {
     }
   };
 
+  const uploadPDF = async () => {
+
+  if (!selectedFile) {
+    setUploadMessage("Please select a PDF first.");
+    return;
+  }
+
+  setUploading(true);
+  setUploadMessage("Processing PDF...");
+
+  const formData = new FormData();
+
+  formData.append(
+    "file",
+    selectedFile
+  );
+
+  try {
+
+    const response = await fetch(
+      "http://127.0.0.1:8000/upload",
+      {
+        method: "POST",
+        body: formData,
+      }
+    );
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        data.detail || "Upload failed"
+      );
+    }
+
+    setUploadMessage(
+      `✅ ${data.filename} processed successfully. ${data.chunks} chunks created.`
+    );
+
+  } catch (error) {
+
+    console.error(error);
+
+    setUploadMessage(
+      "❌ Failed to process PDF."
+    );
+
+  } finally {
+
+    setUploading(false);
+  }
+};
+
   return (
     <div className="app">
       <div className="chat-container">
@@ -86,6 +143,42 @@ function App() {
         </header>
 
         <main className="messages">
+          <div className="upload-section">
+
+            <label>
+              📄 Upload Study PDF
+            </label>
+            
+            <div className="upload-controls">
+            
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(event) =>
+                  setSelectedFile(
+                    event.target.files[0]
+                  )
+                }
+              />
+          
+              <button
+                onClick={uploadPDF}
+                disabled={uploading}
+              >
+                {uploading
+                  ? "Processing..."
+                  : "Upload PDF"}
+              </button>
+                
+            </div>
+                
+            {uploadMessage && (
+              <p className="upload-message">
+                {uploadMessage}
+              </p>
+            )}
+          
+          </div>
 
           {messages.length === 0 && (
             <div className="welcome">

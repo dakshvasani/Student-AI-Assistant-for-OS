@@ -1,12 +1,19 @@
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    UploadFile,
+    File
+)
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
 
 from search import search_documents
+from document_processor import process_pdf
 
 
 # --------------------------------------------------
@@ -226,6 +233,76 @@ DOCUMENT CONTEXT:
     except Exception as e:
 
         print("ERROR:", e)
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )
+
+@app.post("/upload")
+async def upload_pdf(
+    file: UploadFile = File(...)
+):
+
+    # ------------------------------------------
+    # Validate file type
+    # ------------------------------------------
+
+    if not file.filename:
+        raise HTTPException(
+            status_code=400,
+            detail="No file selected"
+        )
+
+    if not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are allowed"
+        )
+
+    # ------------------------------------------
+    # Create upload folder
+    # ------------------------------------------
+
+    upload_folder = Path("uploads")
+
+    upload_folder.mkdir(
+        exist_ok=True
+    )
+
+    # ------------------------------------------
+    # Save uploaded PDF
+    # ------------------------------------------
+
+    file_path = (
+        upload_folder /
+        file.filename
+    )
+
+    contents = await file.read()
+
+    file_path.write_bytes(
+        contents
+    )
+
+    # ------------------------------------------
+    # Process PDF
+    # ------------------------------------------
+
+    try:
+
+        result = process_pdf(
+            file_path
+        )
+
+        return {
+            "message": "PDF uploaded and processed successfully",
+            **result
+        }
+
+    except Exception as e:
+
+        print("UPLOAD ERROR:", e)
 
         raise HTTPException(
             status_code=500,

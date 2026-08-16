@@ -183,6 +183,48 @@ footer {
   color: #666;
 }
 
+.upload-section {
+  padding: 15px 20px;
+  border-bottom: 1px solid #eee;
+  background: #fafafa;
+}
+
+.upload-section label {
+  display: block;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.upload-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.upload-controls input {
+  flex: 1;
+}
+
+.upload-controls button {
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  background: #222;
+  color: white;
+  cursor: pointer;
+}
+
+.upload-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.upload-message {
+  margin: 8px 0 0;
+  font-size: 13px;
+  color: #555;
+}
+
 @media (max-width: 600px) {
   .app {
     padding: 0;
