@@ -6,100 +6,200 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from google import genai
 
+from search import search_documents
 
-# Load environment variables
+
+# --------------------------------------------------
+# Environment
+# --------------------------------------------------
+
 load_dotenv()
 
-# Get Gemini API key
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    raise RuntimeError("GEMINI_API_KEY is not configured")
+    raise RuntimeError(
+        "GEMINI_API_KEY is not configured"
+    )
 
 
-# Create Gemini client
-client = genai.Client(api_key=GEMINI_API_KEY)
+# --------------------------------------------------
+# Gemini
+# --------------------------------------------------
 
-
-# Create FastAPI app
-app = FastAPI(
-    title="GenAI Student Assistant",
-    description="AI assistant for students",
-    version="1.0.0"
+client = genai.Client(
+    api_key=GEMINI_API_KEY
 )
 
 
-# Allow React frontend to communicate with backend
+# --------------------------------------------------
+# FastAPI
+# --------------------------------------------------
+
+app = FastAPI(
+    title="GenAI Student Assistant",
+    description="RAG-powered student AI assistant",
+    version="2.0.0"
+)
+
+
+# --------------------------------------------------
+# CORS
+# --------------------------------------------------
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=[
+        "http://localhost:5173"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# Request model
+# --------------------------------------------------
+# Request Model
+# --------------------------------------------------
+
 class QuestionRequest(BaseModel):
     question: str
 
 
-# Home endpoint
+# --------------------------------------------------
+# Home
+# --------------------------------------------------
+
 @app.get("/")
 def home():
+
     return {
-        "message": "GenAI Student Assistant API is running"
+        "message": "GenAI Student Assistant RAG API is running"
     }
 
 
-# Ask AI endpoint
+# --------------------------------------------------
+# Ask Question
+# --------------------------------------------------
+
 @app.post("/ask")
 def ask_ai(request: QuestionRequest):
 
     question = request.question.strip()
 
     if not question:
+
         raise HTTPException(
             status_code=400,
             detail="Question cannot be empty"
         )
 
-    prompt = f"""
-You are a helpful college student assistant.
+    try:
 
-Your job is to help students understand:
-- College information
-- Academic topics
-- Learning materials
-- Programming concepts
-- Assignments
-- General study questions
+        # ------------------------------------------
+        # Step 1: Search PDF
+        # ------------------------------------------
 
-Rules:
-1. Explain things clearly and simply.
-2. Use examples whenever useful.
-3. If you don't know something, say that you don't know.
-4. Do not invent college-specific information.
-5. Keep answers useful and reasonably concise.
+        results = search_documents(
+            question,
+            top_k=5
+        )
 
-Student question:
+
+        # ------------------------------------------
+        # Step 2: Prepare context
+        # ------------------------------------------
+
+        context_parts = []
+
+        for result in results:
+
+            context_parts.append(
+                f"""
+--- Document Section {result['chunk_id']} ---
+{result['text']}
+"""
+            )
+
+        context = "\n".join(
+            context_parts
+        )
+
+
+        # ------------------------------------------
+        # Step 3: Create RAG prompt
+        # ------------------------------------------
+
+        prompt = f"""
+You are a helpful college Student AI Assistant.
+
+Answer the student's question using ONLY
+the information provided in the document context.
+
+IMPORTANT RULES:
+
+1. Use the document context as your primary source.
+2. Do not invent information.
+3. If the answer cannot be found in the
+   provided context, clearly say:
+
+   "I couldn't find this information
+   in the provided study material."
+
+4. Explain difficult concepts in simple language.
+5. Give examples when useful.
+6. Keep the answer clear and concise.
+
+STUDENT QUESTION:
 
 {question}
+
+
+DOCUMENT CONTEXT:
+
+{context}
 """
 
-    try:
+
+        # ------------------------------------------
+        # Step 4: Ask Gemini
+        # ------------------------------------------
+
         response = client.models.generate_content(
             model="gemini-3.6-flash",
             contents=prompt
         )
 
+
+        # ------------------------------------------
+        # Step 5: Return answer
+        # ------------------------------------------
+
+        sources = []
+
+        for result in results:
+
+            sources.append({
+                "chunk_id": result["chunk_id"],
+                "similarity": round(
+                    result["score"],
+                    4
+                )
+            })
+
+
         return {
             "question": question,
-            "answer": response.text
+            "answer": response.text,
+            "sources": sources
         }
 
+
     except Exception as e:
+
+        print("ERROR:", e)
+
         raise HTTPException(
             status_code=500,
-            detail=f"AI request failed: {str(e)}"
+            detail=str(e)
         )
