@@ -1,0 +1,22 @@
+# Python
+backend/venv/
+backend/__pycache__/
+backend/*.pyc
+
+# Environment variables
+backend/.env
+
+# Generated files
+backend/extracted_text.txt
+backend/chunks.json
+backend/vector_store.json
+
+# PDFs
+backend/documents/*.pdf
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+.env
