@@ -32,6 +32,7 @@ function App() {
         },
         body: JSON.stringify({
           question: userQuestion,
+          history: messages,
         }),
       });
 

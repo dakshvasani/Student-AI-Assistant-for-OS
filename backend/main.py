@@ -62,8 +62,14 @@ app.add_middleware(
 # Request Model
 # --------------------------------------------------
 
+class Message(BaseModel):
+    role: str
+    text: str
+
+
 class QuestionRequest(BaseModel):
     question: str
+    history: list[Message] = []
 
 
 # --------------------------------------------------
@@ -81,14 +87,12 @@ def home():
 # --------------------------------------------------
 # Ask Question
 # --------------------------------------------------
-
 @app.post("/ask")
 def ask_ai(request: QuestionRequest):
 
     question = request.question.strip()
 
     if not question:
-
         raise HTTPException(
             status_code=400,
             detail="Question cannot be empty"
@@ -97,7 +101,7 @@ def ask_ai(request: QuestionRequest):
     try:
 
         # ------------------------------------------
-        # Step 1: Search PDF
+        # Step 1: Search the PDF
         # ------------------------------------------
 
         results = search_documents(
@@ -105,9 +109,8 @@ def ask_ai(request: QuestionRequest):
             top_k=5
         )
 
-
         # ------------------------------------------
-        # Step 2: Prepare context
+        # Step 2: Prepare document context
         # ------------------------------------------
 
         context_parts = []
@@ -121,48 +124,72 @@ def ask_ai(request: QuestionRequest):
 """
             )
 
-        context = "\n".join(
-            context_parts
-        )
-
+        context = "\n".join(context_parts)
 
         # ------------------------------------------
-        # Step 3: Create RAG prompt
+        # Step 3: Prepare conversation history
+        # ------------------------------------------
+
+        conversation = ""
+
+        for message in request.history[-10:]:
+
+            role = (
+                "Student"
+                if message.role == "user"
+                else "Assistant"
+            )
+
+            conversation += (
+                f"{role}: {message.text}\n"
+            )
+
+        # ------------------------------------------
+        # Step 4: RAG + Conversation prompt
         # ------------------------------------------
 
         prompt = f"""
 You are a helpful college Student AI Assistant.
 
-Answer the student's question using ONLY
-the information provided in the document context.
+Your job is to help students understand
+their academic study material.
+
+Use the provided document context to answer
+the student's question.
+
+You also have access to the recent conversation
+history so you can understand follow-up questions.
 
 IMPORTANT RULES:
 
 1. Use the document context as your primary source.
-2. Do not invent information.
-3. If the answer cannot be found in the
-   provided context, clearly say:
+2. Use conversation history to understand context.
+3. Do not invent information.
+4. If the answer cannot be found in the provided
+   study material, say:
 
    "I couldn't find this information
    in the provided study material."
 
-4. Explain difficult concepts in simple language.
-5. Give examples when useful.
-6. Keep the answer clear and concise.
+5. Explain difficult concepts simply.
+6. Give examples when useful.
+7. Keep answers clear and concise.
 
-STUDENT QUESTION:
+RECENT CONVERSATION:
+
+{conversation}
+
+CURRENT STUDENT QUESTION:
 
 {question}
-
 
 DOCUMENT CONTEXT:
 
 {context}
 """
 
-
         # ------------------------------------------
-        # Step 4: Ask Gemini
+        # Step 5: Gemini
         # ------------------------------------------
 
         response = client.models.generate_content(
@@ -170,9 +197,8 @@ DOCUMENT CONTEXT:
             contents=prompt
         )
 
-
         # ------------------------------------------
-        # Step 5: Return answer
+        # Step 6: Sources
         # ------------------------------------------
 
         sources = []
@@ -187,13 +213,15 @@ DOCUMENT CONTEXT:
                 )
             })
 
+        # ------------------------------------------
+        # Step 7: Return response
+        # ------------------------------------------
 
         return {
             "question": question,
             "answer": response.text,
             "sources": sources
         }
-
 
     except Exception as e:
 
